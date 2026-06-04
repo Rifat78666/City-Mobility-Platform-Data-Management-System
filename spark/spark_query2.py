@@ -11,6 +11,33 @@ Two Spark implementations:
   (B) DataFrame-based
 """
 
+# ── Environment setup (must happen BEFORE importing pyspark) ─────
+# 1. cloudpickle shim: PySpark 4.x bundles an older cloudpickle that
+#    recurses infinitely when serializing lambdas on Python 3.14.
+#    Force PySpark to use the standalone pip-installed cloudpickle.
+# 2. PYSPARK_PYTHON: tell Spark workers exactly which python.exe to
+#    use (otherwise Windows routes `python` to the Microsoft Store
+#    stub, and worker processes fail to start).
+import os
+import sys
+
+os.environ["PYSPARK_PYTHON"]        = sys.executable
+os.environ["PYSPARK_DRIVER_PYTHON"] = sys.executable
+
+try:
+    import cloudpickle as _cloudpickle
+    _cp_ver = getattr(_cloudpickle, "__version__", "0")
+    sys.modules["pyspark.cloudpickle"] = _cloudpickle
+    sys.modules["pyspark.cloudpickle.cloudpickle"] = _cloudpickle
+    sys.modules["pyspark.cloudpickle.cloudpickle_fast"] = _cloudpickle
+    print(f"[Patch] Using standalone cloudpickle {_cp_ver}")
+    print(f"[Patch] PYSPARK_PYTHON = {sys.executable}")
+except ImportError:
+    print("[Patch] standalone cloudpickle not installed — "
+          "RDD path may fail on Python 3.14")
+
+import json
+import tempfile
 import time
 from pymongo import MongoClient
 from pyspark.sql import SparkSession
@@ -87,11 +114,29 @@ def query2_rdd(spark, trips):
 # ════════════════════════════════════════════════════════════════
 
 def query2_dataframe(spark, users, trips):
-    print("\n[DataFrame] Running Query 2...")
+    """
+    DataFrame path. To avoid PySpark's Python-worker IPC (which is broken
+    on Python 3.14 + Windows), we serialize the data to JSON files first
+    and let Spark read them via spark.read.json() — pure JVM, no Python
+    workers in the data path. Aggregation runs as native Spark SQL.
+    Results are displayed with .show() (JVM-side) instead of .collect().
+    """
+    print("\n[DataFrame] Running Query 2 (JSON-staged, JVM-native)...")
     start = time.perf_counter()
 
-    trips_df = spark.createDataFrame(trips, ["user_id", "duration_min"])
-    users_df = spark.createDataFrame(users, ["user_id", "name", "surname"])
+    tmp_dir = tempfile.mkdtemp(prefix="adm_q2_")
+    users_path = tmp_dir + "/users.json"
+    trips_path = tmp_dir + "/trips.json"
+
+    with open(users_path, "w", encoding="utf-8") as f:
+        for uid, name, surname in users:
+            f.write(json.dumps({"user_id": uid, "name": name, "surname": surname}) + "\n")
+    with open(trips_path, "w", encoding="utf-8") as f:
+        for uid, dur in trips:
+            f.write(json.dumps({"user_id": uid, "duration_min": dur}) + "\n")
+
+    trips_df = spark.read.json(trips_path)
+    users_df = spark.read.json(users_path)
 
     agg_df = trips_df.groupBy("user_id").agg(
         F.count("*").alias("num_trips"),
@@ -104,13 +149,13 @@ def query2_dataframe(spark, users, trips):
         .orderBy("user_id")
     )
 
-    results = result_df.collect()
-    elapsed = time.perf_counter() - start
-    print(f"[DataFrame] users={len(results)}, time={elapsed:.4f}s")
+    n = result_df.count()
     print("Sample (first 3):")
-    for row in results[:3]:
-        print(f"  {row['name']} {row['surname']} | trips={row['num_trips']} avg={row['avg_duration_min']}min")
-    return results, elapsed
+    result_df.show(3, truncate=False)
+
+    elapsed = time.perf_counter() - start
+    print(f"[DataFrame] users={n}, time={elapsed:.4f}s")
+    return n, elapsed
 
 
 # ════════════════════════════════════════════════════════════════
@@ -123,12 +168,23 @@ def run():
 
     users, trips = load_data_from_mongo()
 
-    _, t_rdd = query2_rdd(spark, trips)
-    _, t_df  = query2_dataframe(spark, users, trips)
+    # The RDD path spawns Python worker processes that communicate with
+    # the JVM over sockets. On Python 3.14 + Windows + PySpark 4.x the
+    # worker crashes during socket finalization (WinError 10038). The
+    # function definition is kept above for reference; we wrap the call
+    # so the script still completes and the DataFrame path can run.
+    t_rdd = None
+    try:
+        _, t_rdd = query2_rdd(spark, trips)
+    except Exception as e:
+        print(f"\n[RDD] skipped — PySpark worker IPC fails on "
+              f"Python 3.14 + Windows: {type(e).__name__}")
+
+    _, t_df = query2_dataframe(spark, users, trips)
 
     print(f"\n{'='*40}")
     print(f"Summary:")
-    print(f"  RDD-based:        {t_rdd:.4f}s")
+    print(f"  RDD-based:        {t_rdd:.4f}s" if t_rdd is not None else "  RDD-based:        skipped")
     print(f"  DataFrame-based:  {t_df:.4f}s")
     print(f"{'='*40}")
 
