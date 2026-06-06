@@ -35,6 +35,10 @@ adm_project/
 │   ├── benchmark.py              #   PostgreSQL vs MongoDB (36 combos)
 │   └── benchmark_results.csv     #   benchmark results
 │
+├── Schema_Evolution/             # Part 1.3 - add battery_level field
+│   ├── postgres_add_battery_level.sql   #   ALTER TABLE migration
+│   └── mongodb_add_battery_level.py     #   validator update + backfill
+│
 ├── utils/                        # Shared helpers
 │   └── generate_data.py          #   synthetic data generator (PG + MongoDB)
 │
@@ -109,6 +113,12 @@ python Spark/spark_graph.py       # PageRank + Connected Components
 python Benchmark/benchmark.py --target both    # PostgreSQL vs MongoDB
 python Neo4j/neo4j_benchmark.py                # Neo4j queries
 python Spark/spark_graph_benchmark.py          # Spark graph
+```
+
+### 7. Schema evolution (Part 1.3 - add battery_level to BATTERY events)
+```bash
+psql -U postgres -d adm_mobility -f Schema_Evolution/postgres_add_battery_level.sql
+python Schema_Evolution/mongodb_add_battery_level.py
 ```
 
 ## Scale Combinations (as per assignment)
