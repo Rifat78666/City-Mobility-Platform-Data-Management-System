@@ -15,3 +15,6 @@ Thumbs.db
 
 # Temp Spark staging
 adm_q2_*/
+
+# Word temp lock files
+~$*
