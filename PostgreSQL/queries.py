@@ -66,8 +66,8 @@ SELECT
     u.user_id,
     u.name,
     u.surname,
-    COUNT(t.trip_id)                                         AS num_trips,
-    AVG(EXTRACT(EPOCH FROM (t.end_time - t.start_time))/60) AS avg_duration_minutes
+    COUNT(t.trip_id)                                                  AS num_trips,
+    ROUND(AVG(EXTRACT(EPOCH FROM (t.end_time - t.start_time))/60)::numeric, 2) AS avg_duration_minutes
 FROM users u
 LEFT JOIN trips t ON u.user_id = t.user_id
 GROUP BY u.user_id, u.name, u.surname
