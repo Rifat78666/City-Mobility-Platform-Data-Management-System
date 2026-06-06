@@ -1,77 +1,114 @@
 # ADM Project 2025/2026 — City Mobility Platform
 
+A multi-model data management system that stores and analyses bike/scooter
+mobility data (users, stations, trips, events) across four database
+technologies and compares their performance.
+
 ## Project Structure
 
 ```
 adm_project/
-├── relational/
-│   ├── schema.sql          # PostgreSQL DDL (tables + indexes)
-│   └── queries.py          # Q1–Q4 for PostgreSQL
-├── document/
-│   ├── schema.py           # MongoDB collection setup + validators
-│   └── queries.py          # Q1–Q4 for MongoDB (aggregation pipelines)
-├── spark/
-│   └── spark_query2.py     # PySpark Q2: RDD, DataFrame, Spark SQL
-├── graph/                  # (Part 2 — Neo4j)
-├── utils/
-│   ├── generate_data.py    # Synthetic data generator (PG + MongoDB)
-│   └── benchmark.py        # Scalability benchmark runner
-└── README.md
+├── main.py                       # Single entry point (interactive menu)
+├── requirements.txt              # Python dependencies
+│
+├── PostgreSQL/                   # Relational model
+│   ├── schema.sql                #   DDL: tables, constraints, indexes
+│   └── queries.py                #   Q1-Q4 (SQL)
+│
+├── MongoDB/                      # Document model
+│   ├── schema.py                 #   collections, validators, indexes
+│   └── queries.py                #   Q1-Q4 (aggregation pipelines)
+│
+├── Neo4j/                        # Graph model
+│   ├── load_graph.py             #   load data from MongoDB into Neo4j
+│   ├── queries.py                #   Q1-Q2 (Cypher)
+│   ├── neo4j_benchmark.py        #   scalability benchmark
+│   └── neo4j_benchmark.csv       #   benchmark results
+│
+├── Spark/                        # Apache Spark
+│   ├── spark_query2.py           #   Query 2 (RDD + DataFrame)
+│   ├── spark_graph.py            #   PageRank + Connected Components
+│   ├── spark_graph_benchmark.py  #   scalability benchmark
+│   └── spark_graph_benchmark.csv #   benchmark results
+│
+├── Benchmark/                    # Cross-database benchmark
+│   ├── benchmark.py              #   PostgreSQL vs MongoDB (36 combos)
+│   └── benchmark_results.csv     #   benchmark results
+│
+├── utils/                        # Shared helpers
+│   └── generate_data.py          #   synthetic data generator (PG + MongoDB)
+│
+└── Reports/
+    └── ADM_Final_Report.pdf      # Final report
 ```
 
 ## Prerequisites
 
 ### Python packages
 ```bash
-pip install pg8000 pymongo pyspark
+pip install -r requirements.txt
 ```
 
-### Databases
-- PostgreSQL running on localhost:5432 (db: adm_mobility, user: postgres)
-- MongoDB running on localhost:27017
-- Java JDK 8 (for PySpark)
+### Databases (running locally)
+- **PostgreSQL** on `localhost:5432` (database `adm_mobility`, user `postgres`)
+- **MongoDB** on `localhost:27017`
+- **Neo4j** on `bolt://localhost:7687`
+- **Java JDK 8+** (required by PySpark)
 
-## Setup
+## Quick Start
 
-### 1. Create PostgreSQL database
+The easiest way is the single entry point:
+
+```bash
+python main.py
+```
+
+This opens an interactive menu where you can run any step, or choose `a`
+to run the typical setup flow (generate data, then run all queries) in order.
+
+You can also run a single step directly:
+```bash
+python main.py 2      # run PostgreSQL queries
+python main.py 4      # run Spark Query 2
+```
+
+## Running Each Part Manually
+
+### 1. Create the PostgreSQL schema
 ```bash
 psql -U postgres -c "CREATE DATABASE adm_mobility;"
-psql -U postgres -d adm_mobility -f relational/schema.sql
+psql -U postgres -d adm_mobility -f PostgreSQL/schema.sql
 ```
 
-### 2. Setup MongoDB collections
+### 2. Set up MongoDB collections
 ```bash
-python document/schema.py
+python MongoDB/schema.py
 ```
 
-## Running
-
-### Generate data (example: 1k users, 10k trips, 2 events/trip)
+### 3. Generate data (example: 1k users, 10k trips, 2 events/trip)
 ```bash
 python utils/generate_data.py --users 1000 --trips 10000 --events 2 --target both
 ```
 
-### Run PostgreSQL queries
+### 4. Run the queries
 ```bash
-python relational/queries.py
+python PostgreSQL/queries.py      # relational Q1-Q4
+python MongoDB/queries.py         # document Q1-Q4
+python Spark/spark_query2.py      # Spark Query 2 (RDD + DataFrame)
 ```
 
-### Run MongoDB queries
+### 5. Graph part (Neo4j)
 ```bash
-python document/queries.py
+python Neo4j/load_graph.py        # load MongoDB data into Neo4j
+python Neo4j/queries.py           # Cypher Q1-Q2
+python Spark/spark_graph.py       # PageRank + Connected Components
 ```
 
-### Run Spark Query 2
+### 6. Scalability benchmarks
 ```bash
-spark-submit \
-  --packages org.mongodb.spark:mongo-spark-connector_2.12:10.2.1 \
-  spark/spark_query2.py
-```
-
-### Run full scalability benchmark
-```bash
-python utils/benchmark.py --target both
-# Results saved to utils/benchmark_results.csv
+python Benchmark/benchmark.py --target both    # PostgreSQL vs MongoDB
+python Neo4j/neo4j_benchmark.py                # Neo4j queries
+python Spark/spark_graph_benchmark.py          # Spark graph
 ```
 
 ## Scale Combinations (as per assignment)
@@ -81,3 +118,5 @@ python utils/benchmark.py --target both
 | 10k   | 50k    | 2           |
 | 50k   | 100k   | 5           |
 |       |        | 10          |
+
+3 x 3 x 4 = **36 combinations** tested per database.

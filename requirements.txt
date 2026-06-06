@@ -1,0 +1,17 @@
+# Advanced Data Management Project — Python dependencies
+# Install with:  pip install -r requirements.txt
+
+# PostgreSQL driver (pure-Python, no compiler needed)
+pg8000>=1.30
+
+# MongoDB driver
+pymongo>=4.6
+
+# Neo4j driver (Bolt protocol)
+neo4j>=5.0
+
+# Apache Spark (PySpark)
+pyspark>=4.0
+
+# Required so PySpark can serialize lambdas on Python 3.14
+cloudpickle>=3.1

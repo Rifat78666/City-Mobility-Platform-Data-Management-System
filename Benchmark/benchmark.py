@@ -21,8 +21,8 @@ import time
 sys.path.insert(0, os.path.dirname(os.path.dirname(__file__)))
 
 from utils.generate_data import generate_postgres, generate_mongo
-from relational.queries   import run_all_queries as pg_queries
-from document.queries     import run_all_queries as mongo_queries
+from PostgreSQL.queries  import run_all_queries as pg_queries
+from MongoDB.queries     import run_all_queries as mongo_queries
 
 USERS_SIZES  = [1_000, 10_000, 50_000]
 TRIPS_SIZES  = [10_000, 50_000, 100_000]
