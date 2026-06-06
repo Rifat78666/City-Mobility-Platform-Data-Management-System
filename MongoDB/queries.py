@@ -96,7 +96,7 @@ Q2_PIPELINE = [
             "$cond": [
                 {"$gt": [{"$size": "$trips"}, 0]},
                 {
-                    "$divide": [
+                    "$round": [
                         {
                             "$avg": {
                                 "$map": {
@@ -111,7 +111,7 @@ Q2_PIPELINE = [
                                 }
                             }
                         },
-                        1,
+                        2,  # round to 2 decimal places
                     ]
                 },
                 0,
